@@ -7,19 +7,32 @@
 ## install qbittorrent-api
 ## py -3 -m pip install -U qbittorrent-api
 
+from time import sleep
+from turtle import up
 import discord
 from discord.ext import commands
 from discord_slash import SlashCommand, SlashContext
 from discord_slash.utils.manage_commands import create_choice, create_option
 import requests
+import os
+from dotenv import load_dotenv
+from pprint import pprint
 
 import qbittorrentapi
 
+environment_properties_file ='./.env'
+
+# if os.path.isfile(environment_properties_file):
+    # print("Found "+ environment_properties_file + " Loading environment variables")
+load_dotenv()
+# pprint(dict(os.environ), width = 1)
 def filterBy(TorrentInfo,filterType):
     if TorrentInfo[1]==filterType or filterType=="all":
         return True
     else:
         return False
+
+
 
 def filterList(FullList,filterType):
     FilteredList=[]
@@ -152,15 +165,20 @@ CompleteStatus = "completed"
 botChannel = "tower" ## ID CHANNEL OF THE CHANNEL FOR THE BOT TO LISTEN TO ##
 tvCategory = "tv-sonarr" ## CATEGORY IN QBIT FOR TV SHOWS ##
 movieCategory = "radarr" ## CATEGORY IN QBIT FOR MOVIES ##
-host='192.168.1.129'
+qbit_host= os.environ["QBIT_HOST"]
+qbit_port = os.environ["QBIT_PORT"]
+qbit_user = os.environ["QBIT_USER"]
+qbit_pass = os.environ["QBIT_PASS"]
 print("------------------------------------------------")
 
-print("Connecting to qBitTorrent at {}...",host)
+print("Connecting to qBitTorrent at {}...",qbit_host)
 
 print("------------------------------------------------")
-qbt_client = qbittorrentapi.Client(host, port=6880, username='admin', password='rawtal0972') ## QBIT WEB LOGIN DETAILS ##
+qbt_client = qbittorrentapi.Client(qbit_host, qbit_port, qbit_user, qbit_pass) ## QBIT WEB LOGIN DETAILS ##
 
-TOKEN = "OTU5MTIyMTYxNDAwOTYzMTIy.YkXSHg.OTBxzA4hwUJnzvJqmL5zDcCvFu0" ## DISCORD BOT SECRET ##
+TOKEN = os.environ['TOKEN']
+
+# "OTU5MTIyMTYxNDAwOTYzMTIy.YkXSHg.OTBxzA4hwUJnzvJqmL5zDcCvFu0" ## DISCORD BOT SECRET ##
 
 #############################
 #############################
@@ -225,7 +243,7 @@ print("Connecting to Discord...")
 print("------------------------------------------------")
 
 client = discord.Client()
-prefix = "$"
+prefix = "/"
 bot=commands.Bot(command_prefix=prefix)
 slash = SlashCommand(bot,sync_commands=True)
 
@@ -294,8 +312,8 @@ slash = SlashCommand(bot,sync_commands=True)
         )
     ]
 )
-async def status(ctx:SlashContext, status:str , category:str = "all"):
-    print("Checking " + status + "Downloads from " + category + " category")
+async def check(ctx:SlashContext, status:str , category:str = "all"):
+    
     if "all" == status:
         updateStatus="all"
     elif "completed" == status:
@@ -316,31 +334,41 @@ async def status(ctx:SlashContext, status:str , category:str = "all"):
             Category=tvCategory
         case "all":
             Category="all"
+    await ctx.send(checkStatus(Category,updateStatus))
+    
 
+def checkStatus(Category:str,updateStatus:str):
+    print("Checking " + updateStatus + " Downloads from " + Category + " category")
     DiscordList=updateAll(Category,updateStatus)
     if DiscordList!=NothingDownloading:
         for i in range(len(DiscordList)):
-                await ctx.send(DiscordList[i])
+               return (DiscordList[i])
     else:
-        await ctx.send(NothingDownloading)
-
+        return (NothingDownloading)
 
 @slash.slash(
     name = "pauseAll",
     description = "Pause all torrents"
 )
 async def pauseAll(ctx:SlashContext):
-    print("Pausing all torrents")
+    await printAndSend(ctx,"Pausing all torrents")
     qbt_client.torrents.pause.all()
-    await ctx.send("Paused all torrents")
+    sleep(2)
+    await printAndSend(ctx,"Paused all torrents\n" + checkStatus('all','all'))
+    
 
 @slash.slash(
     name = "resumeAll",
     description = "Pause all torrents"
 )
 async def resumeAll(ctx:SlashContext):
-    print("Resuming all torrents")
+    await printAndSend(ctx,"Resuming all torrents")
     qbt_client.torrents.resume.all()
-    await ctx.send("Resumed all torrents")
+    sleep(2)
+    await printAndSend(ctx,"Resumed all torrents\n" + checkStatus('all','all'))
+
+async def printAndSend(ctx:SlashContext,message:str):
+    print(message)
+    await ctx.send(message)
 
 bot.run(TOKEN)
